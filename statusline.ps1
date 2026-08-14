@@ -62,22 +62,17 @@ foreach ($arg in $args) {
     }
 }
 
-# Read JSON input from stdin with timeout protection (prevents hanging on blocked pipe)
-$inputJson = ""
-try {
-    if ([Console]::IsInputRedirected) {
-        $task = [System.Threading.Tasks.Task]::Run([System.Func[string]]{ [Console]::In.ReadToEnd() })
-        if ($task.Wait(250)) {
-            $inputJson = $task.Result
+# Read JSON input from stdin
+$inputJson = $input | Out-String
+if (-not $inputJson -or $inputJson.Trim().Length -eq 0) {
+    try {
+        if ([Console]::IsInputRedirected) {
+            $inputJson = [Console]::In.ReadToEnd()
         }
-    } else {
-        $inputJson = $input | Out-String
-    }
-} catch {
-    $inputJson = ""
+    } catch {}
 }
 if (-not $inputJson -or $inputJson.Trim().Length -eq 0) {
-    $inputJson = "{}"
+    exit
 }
 
 # Parse JSON safely
@@ -378,7 +373,7 @@ function make_badge($icon, $val, $icon_color) {
     $bg_color = "236"
     if ($USE_CLASSIC_ICONS) {
         $ansi_c = to_ansi_color $icon_color
-        if (-not $val) {
+        if ($null -eq $val -or "$val" -eq "") {
             return "${ansi_c}${icon}${R}"
         } elseif (-not $icon) {
             return "${NUM_COLOR}${val}${R}"
@@ -388,7 +383,7 @@ function make_badge($icon, $val, $icon_color) {
             return "${ansi_c}${icon} ${NUM_COLOR}${val}${R}"
         }
     } else {
-        if (-not $val) {
+        if ($null -eq $val -or "$val" -eq "") {
             return "$ESC[38;5;${bg_color}m$ESC[48;5;${bg_color}m$ESC[38;5;${icon_color}m${icon}${R}$ESC[38;5;${bg_color}m${R}"
         } elseif (-not $icon) {
             return "$ESC[38;5;${bg_color}m$ESC[48;5;${bg_color}m$ESC[38;5;255m${B}${val}${R}$ESC[38;5;${bg_color}m${R}"
