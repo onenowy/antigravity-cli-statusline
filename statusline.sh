@@ -4,6 +4,9 @@
 
 set -euo pipefail
 export LC_NUMERIC=C
+USE_CLASSIC_ICONS=false
+COLS_OVERRIDE=""
+
 for arg in "$@"; do
   if [ "$arg" = "--version" ] || [ "$arg" = "-v" ]; then
     echo "Antigravity CLI Statusline v0.2.3"
@@ -26,9 +29,9 @@ for arg in "$@"; do
     echo -e "  VCS Branch                     ╱           Current Git branch name (Red + * if dirty)."
     echo -e "  Model                          (None)      Current active LLM model name/ID."
     echo -e "  User Account         👤          (None)      Active user subscription plan and email."
-    echo -e "  Sandbox Network      󰒙          ON (net)    Sandbox enabled with internet access."
-    echo -e "  Sandbox Restricted   󰴴          ON (no-net) Sandbox enabled with network disabled."
-    echo -e "  Sandbox Off          󰦜          sandbox off Sandbox is disabled (runs on host)."
+    echo -e "  Sandbox Network      󰒙          net-on      Sandbox enabled with internet access."
+    echo -e "  Sandbox Restricted   󰴴          net-off     Sandbox enabled with network disabled."
+    echo -e "  Sandbox Off          󰦜          host        Sandbox is disabled (runs on host)."
     echo -e "  Context Bar          󱍏          ctx         Context window usage bar (10 or 20 segments)."
     echo -e "  Tokens Sum                     (None)      Total input/output tokens & turn token delta."
     echo -e "  Sys resources                  sys         Host CPU load average & memory utilization."
@@ -41,6 +44,15 @@ for arg in "$@"; do
     echo -e "  Power Mains (AC)     󰚥          AC          Host is connected to external AC power."
     echo -e "  Power Battery (UPS)  🔋          BAT         Host is running on battery (shows charge %)."
     exit 0
+  fi
+  if [ "$arg" = "--compact" ]; then
+    COLS_OVERRIDE=89
+  elif [ "$arg" = "--medium" ]; then
+    COLS_OVERRIDE=120
+  elif [ "$arg" = "--medium-wide" ]; then
+    COLS_OVERRIDE=150
+  elif [ "$arg" = "--classic" ] || [ "$arg" = "-classic" ] || [ "$arg" = "--no-nerdfont" ] || [ "$arg" = "--compatibility" ]; then
+    USE_CLASSIC_ICONS=true
   fi
 done
 # ─── stdin timeout guard ──────────────────────────────────────────────────────
@@ -184,6 +196,7 @@ NUM_COLOR="${FG_BRIGHT_WHITE}${B}"
 # ─── Numeric Payload Sanitization (Defensive against invalid/string JSON values) ──
 if ! [[ "$USED_PCT" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then USED_PCT=0; fi
 if ! [[ "$COLS" =~ ^[0-9]+$ ]]; then COLS=80; fi
+if [ -n "$COLS_OVERRIDE" ]; then COLS="$COLS_OVERRIDE"; fi
 if ! [[ "$ARTIFACTS" =~ ^[0-9]+$ ]]; then ARTIFACTS=0; fi
 if ! [[ "$SUBAGENTS" =~ ^[0-9]+$ ]]; then SUBAGENTS=0; fi
 if ! [[ "$BG_TASKS" =~ ^[0-9]+$ ]]; then BG_TASKS=0; fi
@@ -256,60 +269,6 @@ _tick_countdown() {
   fi
 }
 
-# ─── Parse CLI Arguments & Theme ─────────────────────────────────────────────
-USE_CLASSIC_ICONS=false
-for arg in "$@"; do
-  if [ "$arg" = "--version" ] || [ "$arg" = "-v" ]; then
-    echo "Antigravity CLI Statusline v0.2.2"
-    exit 0
-  fi
-  if [ "$arg" = "--compact" ]; then
-    COLS=89
-  elif [ "$arg" = "--medium" ]; then
-    COLS=120
-  elif [ "$arg" = "--medium-wide" ]; then
-    COLS=150
-  elif [ "$arg" = "--classic" ] || [ "$arg" = "--no-nerdfont" ] || [ "$arg" = "--compatibility" ] || [ "$arg" = "-l" ] || [ "$arg" = "--legend" ] || [ "$arg" = "legend" ]; then
-    # We parse argument to see if it is legend command
-    if [ "$arg" = "--legend" ] || [ "$arg" = "-l" ] || [ "$arg" = "legend" ]; then
-      echo -e "${FG_BRIGHT_GREEN}${B}🚀 Antigravity CLI Maximized Statusline Legend${R}"
-      echo -e "This statusline adapts dynamically to terminal width and displays high-density system & agent telemetry."
-      echo -e ""
-      echo -e "${B}LAYOUTS:${R}"
-      echo -e "  - ${B}Wide Layout (>= 180 chars):${R} Single-row powerline segment dashboard."
-      echo -e "  - ${B}Medium-Wide Layout (140-179 chars):${R} Double-line boxed telemetry block."
-      echo -e "  - ${B}Medium Layout (100-139 chars):${R} Triple-line boxed telemetry block."
-      echo -e "  - ${B}Small Layout (< 100 chars):${R} Quad-line stacked telemetry dashboard."
-      echo -e ""
-      echo -e "${B}COMPONENTS & ICONS:${R}"
-      echo -e "  ${B}Field                Nerd Font   Classic     Description${R}"
-      echo -e "  --------------------------------------------------------------------------------"
-      echo -e "  State: READY                   ●           Agent is idle, ready for user requests."
-      echo -e "  State: THINKING      󰟷          ◆           Agent is processing/thinking."
-      echo -e "  State: WORKING                 ⚙           Agent is executing background operations."
-      echo -e "  State: TOOL                    🔧          Agent is running a tool."
-      echo -e "  VCS Branch                     ╱           Current Git branch name (Red + * if dirty)."
-      echo -e "  Model                          (None)      Current active LLM model name/ID."
-      echo -e "  Sandbox Network      󰒙          ON (net)    Sandbox enabled with internet access."
-      echo -e "  Sandbox Restricted   󰴴          ON (no-net) Sandbox enabled with network disabled."
-      echo -e "  Sandbox Off          󰦜          sandbox off Sandbox is disabled (runs on host)."
-      echo -e "  Context Bar          󱍏          ctx         Context window usage bar (10 or 20 segments)."
-      echo -e "  Tokens Sum                     (None)      Total input/output tokens parsed."
-      echo -e "  Sys resources                  sys         Host CPU load average & memory utilization."
-      echo -e "  Artifacts                      artifacts   Number of active output artifacts."
-      echo -e "  Subagents            󱙺          subagents   Number of spawned active subagents."
-      echo -e "  Background Tasks               tasks       Number of background tasks running."
-      echo -e "  Current Directory              ╱           Current working directory path (shortened)."
-      echo -e "  Conversation ID      󰍪          ╱           Short prefix of the current session ID."
-      echo -e "  Quota Reset Time     ⌛️         ⌛          Remaining time until LLM quota resets."
-      echo -e "  Power Mains (AC)     󰚥          AC          Host is connected to external AC power."
-      echo -e "  Power Battery (UPS)  🔋          BAT         Host is running on battery (shows charge %)."
-      exit 0
-    fi
-    USE_CLASSIC_ICONS=true
-  fi
-done
-
 # Set dynamic width boundaries
 if [ "$COLS" -ge 180 ]; then
   BAR_LEN=20
@@ -330,9 +289,9 @@ if [ "$USE_CLASSIC_ICONS" = "true" ]; then
   ICON_STATE_UNKNOWN="⏳"
   ICON_VCS="╱"
   ICON_MODEL=""
-  ICON_SANDBOX_NET="ON (net)"
-  ICON_SANDBOX_NONET="ON (no-net)"
-  ICON_SANDBOX_OFF="OFF"
+  ICON_SANDBOX_NET="net-on"
+  ICON_SANDBOX_NONET="net-off"
+  ICON_SANDBOX_OFF="host"
   ICON_CONTEXT_BAR="ctx"
   ICON_ARTIFACTS="artifacts"
   ICON_SUBAGENTS="subagents"
@@ -427,20 +386,12 @@ else
   FG_META_TEXT="\033[38;5;250m"
 fi
 
-# ─── Git Timeout Resilience Wrapper ──────────────────────────────────────────
-run_with_timeout() {
-  if command -v timeout &>/dev/null; then
-    timeout 1 "$@"
-  else
-    "$@"
-  fi
-}
-
+# ─── VCS / Git Status ────────────────────────────────────────────────────────
 GIT_DIR="${CWD:-.}"
-VCS_BRANCH=$(run_with_timeout git -C "$GIT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+VCS_BRANCH=$(run_with_timeout 1 git -C "$GIT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
 if [ -n "$VCS_BRANCH" ]; then
   VCS_TYPE="git"
-  if run_with_timeout git -C "$GIT_DIR" status --porcelain 2>/dev/null | grep -q .; then
+  if run_with_timeout 1 git -C "$GIT_DIR" status --porcelain 2>/dev/null | grep -q .; then
     VCS_DIRTY="true"
   else
     VCS_DIRTY="false"
@@ -515,7 +466,8 @@ shorten_path() {
 CWD_SHORT=$(shorten_path "$CWD")
 
 visible_len() {
-  printf '%s' "$(echo -e "$1" | sed 's/\x1b\[[0-9;]*m//g')" | wc -m
+  local esc; esc=$(printf '\033')
+  printf '%s' "$(echo -e "$1" | sed -E "s/${esc}\[[0-9;]*[a-zA-Z]//g")" | wc -m
 }
 
 # Get Tailscale and Host Info
@@ -574,7 +526,7 @@ make_segment() {
 
   local current_bg_code="${bg_color}"
   local next_bg_code="${next_bg}"
-  local fg_sep_code=$(echo -n "$current_bg_code" | sed 's/48;/38;/')
+  local fg_sep_code="${current_bg_code//48;/38;}"
   
   if [ -n "$next_bg_code" ]; then
     echo -n "${current_bg_code}${fg_text} ${text} ${next_bg_code}${fg_sep_code}${R}"
@@ -586,6 +538,7 @@ make_segment() {
 to_ansi_color() {
   local code="$1"
   case "$code" in
+    220) echo -n "${FG_YELLOW}" ;;
     75)  echo -n "${FG_BRIGHT_BLUE}" ;;
     37)  echo -n "${FG_BRIGHT_CYAN}" ;;
     135) echo -n "${FG_BRIGHT_MAGENTA}" ;;
@@ -606,11 +559,25 @@ make_badge() {
   
   if [ "$USE_CLASSIC_ICONS" = "true" ]; then
     local ansi_c=$(to_ansi_color "$icon_color")
-    echo -n "${ansi_c}${icon} ${NUM_COLOR}${val}${R}"
+    if [ -z "$val" ]; then
+      echo -n "${ansi_c}${icon}${R}"
+    elif [ -z "$icon" ]; then
+      echo -n "${NUM_COLOR}${val}${R}"
+    elif [ "$icon" = "$val" ]; then
+      echo -n "${ansi_c}${icon}${R}"
+    else
+      echo -n "${ansi_c}${icon} ${NUM_COLOR}${val}${R}"
+    fi
     return
   fi
 
-  echo -n "\033[38;5;${bg_color}m\033[48;5;${bg_color}m\033[38;5;${icon_color}m${icon} \033[38;5;255m\033[1m${val}\033[0m\033[38;5;${bg_color}m\033[0m"
+  if [ -z "$val" ]; then
+    echo -n "\033[38;5;${bg_color}m\033[48;5;${bg_color}m\033[38;5;${icon_color}m${icon}\033[0m\033[38;5;${bg_color}m\033[0m"
+  elif [ -z "$icon" ]; then
+    echo -n "\033[38;5;${bg_color}m\033[48;5;${bg_color}m\033[38;5;255m\033[1m${val}\033[0m\033[38;5;${bg_color}m\033[0m"
+  else
+    echo -n "\033[38;5;${bg_color}m\033[48;5;${bg_color}m\033[38;5;${icon_color}m${icon} \033[38;5;255m\033[1m${val}\033[0m\033[38;5;${bg_color}m\033[0m"
+  fi
 }
 
 # ─── Quota formatting ────────────────────────────────────────────────────────
@@ -781,34 +748,12 @@ else
   fi
 fi
 
-
 if [ "${Q_5H_R:- -1}" -gt 0 ] 2>/dev/null; then
   Q_5H_R=$(_tick_countdown "$Q_5H_R" "/tmp/agy_quota_5h_reset")
 fi
 if [ "${Q_WK_R:- -1}" -gt 0 ] 2>/dev/null; then
   Q_WK_R=$(_tick_countdown "$Q_WK_R" "/tmp/agy_quota_wk_reset")
 fi
-
-QUOTA_FMT=""
-if { [ -n "$Q_5H" ] && [ "$Q_5H" != "-1" ]; } || { [ -n "$Q_WK" ] && [ "$Q_WK" != "-1" ]; }; then
-  QUOTA_FMT="$(make_quota_bar "$Q_5H" "5H" "37" "$Q_5H_R") $(make_quota_bar "$Q_WK" "7D" "135" "$Q_WK_R")"
-fi
-
-# Right-align printing helper
-print_right_aligned() {
-  local left="$1"
-  local right="$2"
-  local total_cols="$3"
-
-  local left_vis right_vis pad
-  left_vis=$(visible_len "$left")
-  right_vis=$(visible_len "$right")
-
-  pad=$(( total_cols - left_vis - right_vis ))
-  [ "$pad" -lt 1 ] && pad=1
-
-  printf "%b%*s%b\n" "$left" "$pad" "" "$right"
-}
 
 # ─── Context Bar Formatting ──────────────────────────────────────────────────
 FILLED=$((PCT_INT * BAR_LEN / 100))
@@ -921,23 +866,6 @@ elif [ -n "$MACOS_AC_ON" ]; then
   fi
 fi
 
-# Token counters
-TOK_DETAILS_WIDE=""
-TOK_DETAILS_MED=""
-if [ "$CTX_USED" -gt 0 ] 2>/dev/null; then
-  turn_str=""
-  if [ "$TURN_INPUT_TOKENS" -gt 0 ] || [ "$TURN_OUTPUT_TOKENS" -gt 0 ]; then
-    turn_str=" | turn: +${TURN_INPUT_FMT}/${TURN_OUTPUT_FMT}"
-  fi
-  if [ "$USE_CLASSIC_ICONS" = "true" ]; then
-    TOK_DETAILS_WIDE=" (${CTX_USED_FMT}/${CTX_LIMIT_FMT})${DOT_L2}(total: ${INPUT_TOK_FMT}/${OUTPUT_TOK_FMT}${turn_str})"
-    TOK_DETAILS_MED=" (${CTX_USED_FMT}/${CTX_LIMIT_FMT})"
-  else
-    TOK_DETAILS_WIDE=" (${CTX_USED_FMT}/${CTX_LIMIT_FMT})${DOT_L2}${FG_YELLOW}${ICON_TOK_SUM} ${R} (total: ${INPUT_TOK_FMT}/${OUTPUT_TOK_FMT}${turn_str})"
-    TOK_DETAILS_MED=" (${CTX_USED_FMT}/${CTX_LIMIT_FMT})"
-  fi
-fi
-
 MODEL_DISP="${MODEL_NAME:-$MODEL_ID}"
 
 # ─── Dynamic LINE1 Assembly (Powerline segments) ────────────────────────────
@@ -951,31 +879,26 @@ case "$STATE" in
     ACTIVE_SEGS+=("${ICON_READY} READY")
     ACTIVE_BGS+=("$BG_READY")
     ACTIVE_FGS+=("$FG_READY_TEXT")
-    S="${FG_BRIGHT_GREEN}${B} ${ICON_READY} READY${R}"
     ;;
   thinking) 
     ACTIVE_SEGS+=("${ICON_THINKING} THINKING")
     ACTIVE_BGS+=("$BG_THINKING")
     ACTIVE_FGS+=("$FG_THINKING_TEXT")
-    S="${FG_BRIGHT_YELLOW}${B} ${ICON_THINKING} THINKING${R}"
     ;;
   working)  
     ACTIVE_SEGS+=("${ICON_WORKING} WORKING")
     ACTIVE_BGS+=("$BG_WORKING")
     ACTIVE_FGS+=("$FG_WORKING_TEXT")
-    S="${FG_BRIGHT_CYAN}${B} ${ICON_WORKING} WORKING${R}"
     ;;
   tool_use) 
     ACTIVE_SEGS+=("${ICON_TOOL} TOOL")
     ACTIVE_BGS+=("$BG_TOOL")
     ACTIVE_FGS+=("$FG_TOOL_TEXT")
-    S="${FG_BRIGHT_MAGENTA}${B} ${ICON_TOOL} TOOL${R}"
     ;;
   *)        
     ACTIVE_SEGS+=("${ICON_STATE_UNKNOWN} $(echo "$STATE" | tr '[:lower:]' '[:upper:]')")
     ACTIVE_BGS+=("$BG_UNKNOWN")
     ACTIVE_FGS+=("$FG_UNKNOWN_TEXT")
-    S="${FG_WHITE}${B} ${ICON_STATE_UNKNOWN} $(echo "$STATE" | tr '[:lower:]' '[:upper:]')${R}"
     ;;
 esac
 
@@ -1034,7 +957,7 @@ if [ -n "$CONV_ID" ] && [ "$COLS" -ge 80 ]; then
   ACTIVE_FGS+=("$FG_META_TEXT")
 fi
 
-# 6. Host IP
+# 7. Host IP
 if [ -n "$HOST_INFO" ] && [ "$COLS" -ge 110 ]; then
   if [ "$USE_CLASSIC_ICONS" = "true" ]; then
     ACTIVE_SEGS+=("${HOST_INFO}")
@@ -1045,7 +968,7 @@ if [ -n "$HOST_INFO" ] && [ "$COLS" -ge 110 ]; then
   ACTIVE_FGS+=("$FG_META_TEXT")
 fi
 
-# 7. Version
+# 8. Version
 if [ -n "$CLI_VERSION" ] && [ "$COLS" -ge 120 ]; then
   ACTIVE_SEGS+=("v${CLI_VERSION}")
   ACTIVE_BGS+=("$BG_META")
