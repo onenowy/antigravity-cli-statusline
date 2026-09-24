@@ -4,13 +4,49 @@
 import json
 import os
 import shutil
+import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 class TestWindowsPowerShellParity(unittest.TestCase):
+
+    @staticmethod
+    def _run_statusline_with_open_pipe(chunks):
+        """Wait for the renderer to exit before closing its stdin write handle."""
+        proc = subprocess.Popen(
+            ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
+             "-File", str(REPO_ROOT / "statusline.ps1")],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        started = time.monotonic()
+        try:
+            for chunk in chunks:
+                proc.stdin.write(chunk)
+                proc.stdin.flush()
+                time.sleep(0.02)
+
+            # communicate() closes stdin and would hide a wait-for-EOF regression.
+            proc.wait(timeout=6.0)
+            elapsed = time.monotonic() - started
+            return (
+                proc.returncode,
+                elapsed,
+                proc.stdout.read().decode("utf-8"),
+                proc.stderr.read().decode("utf-8"),
+            )
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=5.0)
+            proc.stdin.close()
+            proc.stdout.close()
+            proc.stderr.close()
 
     def test_bom_header_present_on_statusline_ps1(self):
         """statusline.ps1 MUST start with UTF-8 BOM bytes (EF BB BF) for legacy Windows PowerShell 5.1."""
@@ -119,6 +155,46 @@ class TestWindowsPowerShellParity(unittest.TestCase):
         self.assertIn("Win32_Battery", ps1_text)
         self.assertIn("ICON_AC", ps1_text)
         self.assertIn("ICON_BAT", ps1_text)
+
+    @unittest.skipUnless(os.name == "nt" and shutil.which("powershell.exe"),
+                         "Windows PowerShell is required")
+    def test_powershell_open_pipe_fragmented_writes_and_quota_telemetry(self):
+        """Read a split UTF-8 character and render stdin telemetry before EOF."""
+        payload = (json.dumps({
+            "model": {"id": "gemini-🔋-pro"},
+            "agent_state": "working",
+            "quota": {
+                "gemini-5h": {"remaining_fraction": 0.82, "reset_in_seconds": 3600},
+                "gemini-weekly": {"remaining_fraction": 0.64, "reset_in_seconds": 86400},
+            },
+            "terminal_width": 120,
+        }, ensure_ascii=False)).encode("utf-8")
+        glyph_at = payload.index("🔋".encode("utf-8"))
+        chunks = [payload[:glyph_at + 1], payload[glyph_at + 1:glyph_at + 2],
+                  payload[glyph_at + 2:]]
+
+        returncode, elapsed, stdout, stderr = self._run_statusline_with_open_pipe(chunks)
+        self.assertEqual(returncode, 0)
+        self.assertLess(elapsed, 5.0)
+        self.assertEqual(stderr.strip(), "")
+        self.assertIn("WORKING", stdout)
+        self.assertIn("gemini-🔋-pro", stdout)
+        self.assertIn("82%", stdout)
+        self.assertIn("5H", stdout)
+        self.assertIn("64%", stdout)
+        self.assertIn("7D", stdout)
+
+    @unittest.skipUnless(os.name == "nt" and shutil.which("powershell.exe"),
+                         "Windows PowerShell is required")
+    def test_powershell_open_pipe_stalled_or_partial_input_fallback(self):
+        """Empty and incomplete open pipes exit after the bounded input wait."""
+        for chunks in ([], [b'{"agent_state": "working", "partial": ']):
+            with self.subTest(chunks=chunks):
+                returncode, elapsed, stdout, stderr = self._run_statusline_with_open_pipe(chunks)
+                self.assertEqual(returncode, 0)
+                self.assertLess(elapsed, 5.0)
+                self.assertEqual(stderr.strip(), "")
+                self.assertIn("READY", stdout)
 
 if __name__ == "__main__":
     unittest.main()

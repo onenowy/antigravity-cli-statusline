@@ -76,17 +76,25 @@ if ($null -ne $readFunctionAst) {
     . ([scriptblock]::Create($readFunctionAst.Extent.Text))
 
     Add-Type -TypeDefinition @"
+using System;
 using System.Threading;
+using System.Threading.Tasks;
 public sealed class StatuslineTestTextReader : System.IO.TextReader {
     private readonly string content;
     private readonly int delayMilliseconds;
+    private int position = 0;
     public StatuslineTestTextReader(string content, int delayMilliseconds) {
-        this.content = content;
+        this.content = content ?? string.Empty;
         this.delayMilliseconds = delayMilliseconds;
     }
-    public override string ReadToEnd() {
-        Thread.Sleep(delayMilliseconds);
-        return content;
+    public override Task<int> ReadAsync(char[] buffer, int index, int count) {
+        return Task.Run(() => {
+            Thread.Sleep(delayMilliseconds);
+            int toRead = Math.Min(count, content.Length - position);
+            content.CopyTo(position, buffer, index, toRead);
+            position += toRead;
+            return toRead;
+        });
     }
 }
 "@
